@@ -66,8 +66,28 @@ def create_task(connection, task):
     return cur.lastrowid
 
 
+def create_raw_info_task(connection, task):
+    sql = ''' INSERT INTO cpu_load_raw(rawinfo,mode,ts,platform,rm)  VALUES(?,?,?,?,?) '''
+    cur = connection.cursor()
+    cur.execute(sql, task)
+    return cur.lastrowid
+
+
+mode = "depth*2"
+
+
+# 需要手动设置 fe depth fe+depth*3+ir*3 fe+depth*3(normal) vision_callback
+# mode = "normal"
+# mode = "fe_depth"
+# mode = "depth_T"
+# mode = "fisheye_callback"
+# mode = "depth*1_callback"
+# mode = "full_callback"
+# mode = "fe_depth_callback"
+# mode = "depth*2_callback"
+# mode = "idle_callback"
 # [vcu, vcore, ccu, ccore, totalRk]
-def store2DB(data, tag):
+def save2DB(data, tag):
     global conn
     with conn:
         plat_form = ""
@@ -88,17 +108,6 @@ def store2DB(data, tag):
         elif tag == tagIntel:
             plat_form = "intel"
 
-        # 需要手动设置 fe depth fe+depth*3+ir*3 fe+depth*3(normal) vision_callback
-        # mode = "normal"
-        # mode = "fe_depth"
-        # mode = "depth_T"
-        mode = "depth*2"
-        # mode = "fisheye_callback"
-        # mode = "depth*1_callback"
-        # mode = "full_callback"
-        # mode = "fe_depth_callback"
-        # mode = "depth*2_callback"
-        # mode = "idle_callback"
         ts = datetime.datetime.now()
         vision_info = (
             mode, "vision", data[0], data[1], str(ts), freq_dict[data[1]](tag), plat_form, "")
@@ -109,6 +118,19 @@ def store2DB(data, tag):
         create_task(conn, vision_info)
         create_task(conn, checker_info)
         create_task(conn, vision_callback_info)
+
+
+def saveRawInfo2DB(strData, tag):
+    global conn
+    with conn:
+        plat_form = ""
+        if tag == tagRk:
+            plat_form = "rk3399"
+        elif tag == tagIntel:
+            plat_form = "intel"
+        ts = datetime.datetime.now()
+        raw_info = (strData, mode, plat_form, ts, "")
+        create_raw_info_task(conn, raw_info)
 
 
 # grep top result
@@ -147,12 +169,14 @@ def sh(command, tag):
 def getCpu():
     rkRes = sh('adb -s 9Y6N950H1Z shell busybox top -d 1 -n 1', tagRk)
     intelRes = sh("adb -s 54AGE18GL20830 shell busybox top -d 1 -n 1", tagIntel)
+    saveRawInfo2DB(rkRes, tagRk)
+    saveRawInfo2DB(intelRes, tagIntel)
     # print("-------------")
     analysRkRes = analysisCpuInfo(rkRes, tagRk)
     analysIntelRes = analysisCpuInfo(intelRes, tagIntel)
     # save to db
-    store2DB(analysRkRes, tagRk)
-    store2DB(analysIntelRes, tagIntel)
+    save2DB(analysRkRes, tagRk)
+    save2DB(analysIntelRes, tagIntel)
 
 
 def filt(e):
@@ -213,8 +237,6 @@ def analysisCpuInfo(cpuInfos, flag):
     #         totalIntel.append(tcu)
     # if vcu is not None and ccu is not None:
 
-
-
     if flag == tagRk:
         print("RK3399 vision :", vcu, "% @core", vcore, " checker:", ccu, "% @core", ccore,
               " total: ", tcu, "%.")
@@ -253,6 +275,9 @@ def main():
             '''CREATE TABLE cpu_load_info ( pid INTEGER, mode INTEGER, pname TEXT, cpu TEXT, 
             core INTEGER, ts TEXT, freq TEXT, platform TEXT, rm TEXT, PRIMARY KEY(pid) 
             )''')
+    if not isTable(conn, 'cpu_load_raw'):
+        conn.execute('''CREATE TABLE cpu_load_raw ( pid INTEGER,rawinfo TEXT, mode TEXT, platform 
+        TEXT, rm TEXT, ts TEXT, PRIMARY KEY(pid) )''')
 
     schedule.every(1).second.do(getCpu)
     schedule.every(1).second.do(getIntelCpu)
