@@ -145,8 +145,8 @@ def sh(command, tag):
 
 
 def getCpu():
-    rkRes = sh('adb -s 9Y6N950H1Z shell busybox top -d 1 -n 1', tagRk)
-    intelRes = sh("adb -s 54AGE18GL20830 shell busybox top -d 1 -n 1", tagIntel)
+    rkRes = sh('adb -s ZCUOGKXY7Z shell busybox top -d 1 -n 1', tagRk)
+    intelRes = sh("adb -s JJ7014E70900017 shell busybox top -d 1 -n 1", tagIntel)
     # print("-------------")
     analysRkRes = analysisCpuInfo(rkRes, tagRk)
     analysIntelRes = analysisCpuInfo(intelRes, tagIntel)
@@ -172,13 +172,35 @@ def analysisCpuInfo(cpuInfos, flag):
     tcu = 0
     vcore = None
     ccore = None
+    count = 0
     for line in commands:
+        if count < 4:
+            count = count + 1
+            continue
+        # if '\n' in line and (len(line) == 0 or len(line) == 1):
+        #     continue
         line = str(line, "utf-8")
         print(line)
+        fields = line.split(" ")
+        while '' in fields:
+            fields.remove('')
+        while '<' in fields:
+            fields.remove('<')
+        if not fields:
+            continue
+
+        print(fields)
+
+        if flag == tagRk:
+            tcu += float(fields[7])
+        elif flag == tagIntel:
+            tcu += float(fields[7])
+            totalIntel.append(tcu)
+
         if '{eservice.vision}' in line:
-            fields = line.split(" ")
-            while '' in fields:
-                fields.remove('')
+            # fields = line.split(" ")
+            # while '' in fields:
+            #     fields.remove('')
             # print(fields)
             vcore = fields[fields.index("{eservice.vision}") - 2]
             vcu = fields[fields.index("{eservice.vision}") - 1]
@@ -191,9 +213,9 @@ def analysisCpuInfo(cpuInfos, flag):
                 vcoreUsageIntel[vcore].append(float(vcu))
 
         if '{nservicechecker}' in line:
-            fields = line.split(" ")
-            while '' in fields:
-                fields.remove('')
+            # fields = line.split(" ")
+            # while '' in fields:
+            #     fields.remove('')
             # print(fields)
             ccore = fields[fields.index("{nservicechecker}") - 2]
             ccu = fields[fields.index("{nservicechecker}") - 1]
@@ -205,20 +227,12 @@ def analysisCpuInfo(cpuInfos, flag):
                 checkerCpuIntel.append(float(ccu))
                 ccoreUsageIntel[ccore].append(float(ccu))
 
-    # if vcu is not None and ccu is not None:
-    #     tcu = round(float(vcu) + float(ccu), 1)
-    #     if flag == tagRk:
-    #         totalRk.append(tcu)
-    #     else:
-    #         totalIntel.append(tcu)
-    # if vcu is not None and ccu is not None:
-
-
-
     if flag == tagRk:
+        totalRk.append(tcu)
         print("RK3399 vision :", vcu, "% @core", vcore, " checker:", ccu, "% @core", ccore,
               " total: ", tcu, "%.")
     if flag == tagIntel:
+        totalIntel.append(tcu)
         print("Intel  vision :", vcu, "% @core", vcore, " checker:", ccu, "% @core", ccore,
               " total: ", tcu, "%.")
     return [vcu, vcore, ccu, ccore, totalRk]
@@ -256,7 +270,7 @@ def main():
 
     schedule.every(1).second.do(getCpu)
     schedule.every(1).second.do(getIntelCpu)
-    schedule.every(10).minutes.do(exit_schedule)
+    schedule.every(2).minutes.do(exit_schedule)
     while flag:
         schedule.run_pending()
 
