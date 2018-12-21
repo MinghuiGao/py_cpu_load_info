@@ -167,7 +167,7 @@ def sh(command, tag):
 
 
 def getCpu():
-    rkRes = sh('adb -s 9Y6N950H1Z shell busybox top -d 1 -n 1', tagRk)
+    rkRes = sh('adb -s ZCUOGKXY7Z shell busybox top -d 1 -n 1', tagRk)
     intelRes = sh("adb -s 54AGE18GL20830 shell busybox top -d 1 -n 1", tagIntel)
     saveRawInfo2DB(rkRes, tagRk)
     saveRawInfo2DB(intelRes, tagIntel)

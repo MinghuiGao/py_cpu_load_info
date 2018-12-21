@@ -103,3 +103,4 @@ venv.bak/
 # mypy
 .mypy_cache/
 cpu_load_info.db
+.idea/workspace.xml
